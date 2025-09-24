@@ -1,14 +1,11 @@
 'use server';
 /**
  * @fileOverview Finds medical practitioners based on a location query.
- *
- * - findPractitioners - A function that takes a location query and returns a list of nearby practitioners.
- * - FindPractitionersInput - The input type for the findPractitioners function.
- * - FindPractitionersOutput - The return type for the findPractitioners function.
+ * This version removes Genkit dependency and returns deterministic, realistic mock data
+ * suitable for production builds and demos.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'zod';
 
 const FindPractitionersInputSchema = z.object({
   locationQuery: z
@@ -37,36 +34,102 @@ export type FindPractitionersOutput = z.infer<typeof FindPractitionersOutputSche
 export async function findPractitioners(
   input: FindPractitionersInput
 ): Promise<FindPractitionersOutput> {
-  return findPractitionersFlow(input);
+  const location = (input.locationQuery || 'Ireland').toLowerCase();
+
+  // Minimal deterministic dataset keyed by common Irish locations
+  const datasets: Record<string, FindPractitionersOutput['practitioners']> = {
+    dublin: [
+      {
+        name: 'Grand Canal Medical Clinic',
+        specialty: 'General Practitioner',
+        address: '21 Grand Canal Street Upper, Dublin 4, D04',
+        phone: '+353 1 555 2143',
+        isHospital: false,
+      },
+      {
+        name: 'St. Stephen\'s Green Family Practice',
+        specialty: 'General Practitioner',
+        address: '8 Harcourt Street, Dublin 2, D02',
+        phone: '+353 1 555 0087',
+        isHospital: false,
+      },
+      {
+        name: 'Dublin City Cardiology Centre',
+        specialty: 'Cardiology',
+        address: '45 Gardiner Street Upper, Dublin 1, D01',
+        phone: '+353 1 555 7321',
+        isHospital: false,
+      },
+      {
+        name: 'Mater Misericordiae University Hospital',
+        specialty: 'Emergency & General Hospital',
+        address: 'Eccles St, Phibsborough, Dublin 7, D07',
+        phone: '+353 1 803 2000',
+        isHospital: true,
+      },
+    ],
+    cork: [
+      {
+        name: 'Lee Side Family Practice',
+        specialty: 'General Practitioner',
+        address: '14 Washington Street, Cork City, T12',
+        phone: '+353 21 555 6612',
+        isHospital: false,
+      },
+      {
+        name: 'Cork Women\'s Health Clinic',
+        specialty: 'Women\'s Health',
+        address: '3 Patrick\'s Quay, Cork City, T12',
+        phone: '+353 21 555 7741',
+        isHospital: false,
+      },
+      {
+        name: 'Cork University Hospital',
+        specialty: 'Emergency & General Hospital',
+        address: 'Wilton, Cork, T12',
+        phone: '+353 21 492 2000',
+        isHospital: true,
+      },
+    ],
+    galway: [
+      {
+        name: 'Eyre Square Medical Practice',
+        specialty: 'General Practitioner',
+        address: '12 Eyre Square, Galway, H91',
+        phone: '+353 91 555 1020',
+        isHospital: false,
+      },
+      {
+        name: 'Galway Respiratory Clinic',
+        specialty: 'Respiratory Medicine',
+        address: 'College Rd, Galway, H91',
+        phone: '+353 91 555 3344',
+        isHospital: false,
+      },
+      {
+        name: 'University Hospital Galway',
+        specialty: 'Emergency & General Hospital',
+        address: 'Newcastle Rd, Galway, H91',
+        phone: '+353 91 544 544',
+        isHospital: true,
+      },
+    ],
+  };
+
+  const pick = () => {
+    if (location.includes('dublin')) return datasets.dublin;
+    if (location.includes('cork')) return datasets.cork;
+    if (location.includes('galway')) return datasets.galway;
+    // Default mixed sample
+    return [
+      datasets.dublin[0],
+      datasets.cork[0],
+      datasets.galway[0],
+      datasets.dublin[2],
+      datasets.cork[2],
+    ];
+  };
+
+  const practitioners = pick();
+  return { practitioners };
 }
-
-const prompt = ai.definePrompt({
-  name: 'findPractitionersPrompt',
-  input: {schema: FindPractitionersInputSchema},
-  output: {schema: FindPractitionersOutputSchema},
-  prompt: `You are an expert directory assistant for a health application in Ireland.
-Your task is to generate a list of 5 to 7 realistic but fictional medical practitioners, clinics, or hospitals based on the user's provided location.
-
-For each practitioner, you must provide:
-- A realistic name (e.g., "The Grand Canal Clinic", "Dr. Siobhan Reilly", "Cork University Hospital").
-- A relevant specialty (e.g., "General Practitioner", "Cardiology", "Emergency & General Hospital").
-- A plausible, location-specific address in Ireland.
-- A fictional but correctly formatted Irish phone number.
-- A boolean 'isHospital' flag, set to true only for large hospitals.
-
-The user's location is: {{{locationQuery}}}
-
-Generate the list of practitioners now.`,
-});
-
-const findPractitionersFlow = ai.defineFlow(
-  {
-    name: 'findPractitionersFlow',
-    inputSchema: FindPractitionersInputSchema,
-    outputSchema: FindPractitionersOutputSchema,
-  },
-  async (input) => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
